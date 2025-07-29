@@ -108,9 +108,12 @@ int main()
     auto train_data = cctorch::MNISTLoader::load_train_data(data_path);
     auto test_data = cctorch::MNISTLoader::load_test_data(data_path);
     int epochs = 2;
-    float learning_rate = 0.01f;
+    float learning_rate = 0.001f;
     MLP mlp;
-    cctorch::SGD optimizer(mlp.parameters(), learning_rate);
+
+    // mlp.load(models_path + "/mlp_epoch_1_250.bin");
+
+    cctorch::Adam optimizer(mlp.parameters(), learning_rate);
     std::cout << "MLP initialized with " << mlp.parameters().size() << " parameters." << std::endl;
     cctorch::CrossEntropyLoss criterion;
     int batch_size = 64;
@@ -118,6 +121,7 @@ int main()
     std::cout << "Training MLP on MNIST dataset..." << std::endl;
     for (int epoch = 1; epoch <= epochs; ++epoch)
     {
+        train_data.shuffle();
         int num_batches = 0;
         for (int i = 0; i < train_data.num_images; i += batch_size)
         {
@@ -130,7 +134,24 @@ int main()
             num_batches++;
             if (num_batches % 1 == 0)
             {
-                std::cout << "Epoch [" << epoch << "/" << epochs << "], Batch [" << num_batches << "], Loss: " << loss.value();
+                int correct = 0;
+                for (int j = 0; j < outputs.size(); j++)
+                {
+                    int mx = 0;
+                    for (int i = 0; i < outputs[j].size(); i++)
+                    {
+                        if (outputs[j][i].value() > outputs[j][mx].value())
+                        {
+                            mx = i;
+                        }
+                    }
+                    if (mx == batch.labels[j])
+                    {
+                        correct++;
+                    }
+                }
+
+                std::cout << "Epoch [" << epoch << "/" << epochs << "], Batch [" << num_batches << "], Loss: " << loss.value() << ", Accuracy: " << (static_cast<float>(correct) / batch.labels.size()) * 100 << "%";
                 auto l1p = mlp.linear1.parameters();
                 auto l2p = mlp.linear2.parameters();
                 auto max_l1 = std::max_element(l1p.begin(), l1p.end(), [&](const cctorch::Tensor &a, const cctorch::Tensor &b)
@@ -156,54 +177,6 @@ int main()
     // 训练结束后保存最终模型
     mlp.save("mlp_final.bin");
     std::cout << "Final model saved as mlp_final.bin" << std::endl;
-
-    // 演示模型加载功能
-    std::cout << "\n--- Testing model save/load functionality ---" << std::endl;
-
-    // 创建一个新的MLP来测试加载
-    MLP test_mlp;
-    std::cout << "Created new MLP for testing load functionality" << std::endl;
-
-    // 加载刚才保存的模型
-    try
-    {
-        test_mlp.load("mlp_final.bin");
-        std::cout << "Successfully loaded model from mlp_final.bin" << std::endl;
-
-        // 可以在这里添加验证代码，比较原模型和加载后模型的参数是否一致
-        auto original_params = mlp.parameters();
-        auto loaded_params = test_mlp.parameters();
-
-        bool params_match = true;
-        if (original_params.size() != loaded_params.size())
-        {
-            params_match = false;
-        }
-        else
-        {
-            for (size_t i = 0; i < original_params.size(); ++i)
-            {
-                if (std::abs(original_params[i].value() - loaded_params[i].value()) > 1e-6)
-                {
-                    params_match = false;
-                    break;
-                }
-            }
-        }
-
-        if (params_match)
-        {
-            std::cout << "✓ Model parameters match after save/load!" << std::endl;
-        }
-        else
-        {
-            std::cout << "✗ Model parameters do not match after save/load!" << std::endl;
-        }
-    }
-    catch (const std::exception &e)
-    {
-        std::cout << "Error loading model: " << e.what() << std::endl;
-    }
 
     return 0;
 }

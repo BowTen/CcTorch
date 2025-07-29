@@ -3,7 +3,7 @@
 
 #include <vector>
 #include <string>
-#include <cstdint>
+#include <random>
 #include "tensor.h"
 
 namespace cctorch
@@ -18,6 +18,17 @@ namespace cctorch
         int num_images;
 
         MNISTData() : image_height(28), image_width(28), num_images(0) {}
+
+        void shuffle()
+        {
+            std::mt19937_64 rng(std::random_device{}());
+            for (int i = images.size() - 1; i > 0; --i)
+            {
+                int j = rng() % (i + 1);
+                std::swap(images[i], images[j]);
+                std::swap(labels[i], labels[j]);
+            }
+        }
     };
 
     class MNISTLoader
